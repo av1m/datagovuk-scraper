@@ -7,7 +7,7 @@ setup(
     packages=find_packages(),
     author="av1m",
     author_email="a@avim.eu",
-    install_requires=["requests", "beautifulsoup4", "aiohttp"],
+    install_requires=["requests", "beautifulsoup4", "aiohttp", "tqdm"],
     description="Scrap public data from data.gov.uk without an API KEY",
     include_package_data=True,
     url="http://github.com/av1m/datagovuk-scraper",
