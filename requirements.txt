@@ -1,0 +1,18 @@
+# Python HTTP for Humans.
+requests==2.27.1
+# Typing stubs for requests
+types-requests==2.27.20
+# Screen-scraping library
+beautifulsoup4==4.11.1
+# Async http client/server framework (asyncio)
+aiohttp==3.8.1
+# The uncompromising code formatter.
+black==22.3.0
+# Formats docstrings to follow PEP 257.
+docformatter==1.4
+# A Python utility / library to sort Python imports.
+isort==5.10.1
+# Fast, Extensible Progress Meter
+tqdm==4.64.0
+# Python code static checker
+pylint==2.13.7
