@@ -20,12 +20,12 @@ Scrap public data from data.gov.uk without an API KEY
     pip install -r requirements.txt
     ```
 
-3. Run the project
+3. Run the project 🚀  
     You can run the project in different ways.
 
     * To get started quickly, you can use the [notebook](get-started-sample.ipynb).
-    * Moreover, you can use the [command line](#cli)
-    * Directly in your code by importing the `datagovuk` module.
+    * Plus, you can use the [command line](#cli)
+    * Or, directly in your code by importing the `datagovuk` module.
 
 ## CLI Usage 📖
 
