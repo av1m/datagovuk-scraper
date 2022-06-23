@@ -11,15 +11,17 @@ import json
 import logging
 import math
 import os
+import shutil
 import time
 from pathlib import Path
 
 import requests
-from aiohttp import ClientResponse, ClientSession
+from aiohttp import ClientResponse, ClientSession, ClientTimeout
 from bs4 import BeautifulSoup
 from tqdm.asyncio import tqdm
 
 logger = logging.getLogger(__name__)
+OUTPUT_DIRECTORY = Path.home() / "datagovuk"
 
 
 class Dataset:
@@ -108,7 +110,7 @@ class Dataset:
         return csv_urls
 
     @staticmethod
-    async def download_file(session: ClientSession, url: str, path: Path) -> None:
+    async def download_file(session: ClientSession, url: str, filepath: Path) -> None:
         """Download a file.
 
         Example:
@@ -120,17 +122,27 @@ class Dataset:
 
         :param session: Aiohttp session
         :type session: ClientSession
-        :param file: A dictionary with information about the file.
-        :type file: dict
+        :param url: The url of the file to download
+        :type url: strint
+        :param filepath: The full path (with filename) where the file will be saved
+        :type filepath: Path
         :return: None
         :rtype: None
         """
-        async with session.get(url) as response:
-            content = await response.read()
-            # Save the file
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(path, "wb") as file:
-                file.write(content)
+        try:
+            response = await session.get(url)
+        except Exception as error:  # pylint: disable=broad-except
+            logger.warning("Error downloading %s", url)
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.exception(error)
+            else:
+                logger.warning(error)
+            return
+        content = await response.read()
+        # Save the file
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        with open(filepath, "wb") as file:
+            file.write(content)
 
     def download_files(self, session: ClientSession) -> list:
         """Download all the files of the dataset.
@@ -142,9 +154,8 @@ class Dataset:
         """
         files = []  # use to gather with asyncio.gather
         for file in self.files:
-            filename: Path = (
-                Path.home() / "datagovuk" / self.id / file["url"].split("/")[-1]
-            )
+            filename: Path = OUTPUT_DIRECTORY / self.id / file["url"].split("/")[-1]
+            logger.debug("On %s, downloading %s", self.id, file["url"])
             files.append(self.download_file(session, file["url"], filename))
         return files
 
@@ -182,6 +193,8 @@ class Scraper:
     Allowed format are ["csv", "ods", "html", "pdf", "xls", "zip"]
     """
 
+    # number of records per page
+    # we can't change this value because the html return always this value
     PER_PAGE: int = 20
 
     def __init__(self, query: str, format_type: str = "CSV") -> None:
@@ -203,12 +216,15 @@ class Scraper:
         :type format_type: str
         """
         assert format_type.lower() in ["csv", "ods", "html", "pdf", "xls", "zip"]
+        # Initialize the http async session
         self.session: ClientSession = ClientSession(
             base_url="https://data.gov.uk/",
             headers={
                 # pylint: disable=line-too-long
                 "User-Agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:23.0) Gecko/20131011 Firefox/23.0"
             },
+            raise_for_status=True,
+            timeout=ClientTimeout(total=40),
         )
         self.query: str = query
         self.format_type: str = format_type
@@ -237,11 +253,9 @@ class Scraper:
                 "q": self.query,
                 "filters[format]": self.format_type.upper(),
                 "sort": "best",
-                "page": page,
+                "page": str(page),
             },
         )
-        # Check the status
-        search_response.raise_for_status()
         logger.info("GET %s", search_response.url)
         return BeautifulSoup(search_response.text, "html.parser")
 
@@ -268,7 +282,6 @@ class Scraper:
             url=f"/dataset/{dataset_id}"
         )
         logger.info("GET dataset %s", dataset_response.url)
-        dataset_response.raise_for_status()
 
         # Create the soup object for the dataset
         dataset_soup: BeautifulSoup = BeautifulSoup(
@@ -282,7 +295,8 @@ class Scraper:
         )
 
     def get_length(self) -> int:
-        """Get the number of datasets matching the query.
+        """Get the number of datasets matching the query (how many results are
+        found).
 
         Example (with 50 datasets):
             >>> scraper = Scraper(query="map", format_type="csv")
@@ -323,6 +337,8 @@ class Scraper:
         ), "The count (number of records) is larger than the number of datasets available on data.gov.uk"
         pages: int = math.ceil(count / self.PER_PAGE)
         assert pages <= self.max_pages, "The count is larger than the number of pages"
+        # count how many item we need to retrieve in the last page
+        # for example, if we want 41 pages and PER_PAGE is 20, the result will be 1
         last_page_item: int = count - ((pages - 1) * self.PER_PAGE)
 
         datasets = []
@@ -330,6 +346,7 @@ class Scraper:
             datasets_containers = self.search(page).find_all(
                 "div", {"class": "dgu-results__result"}
             )
+            # Allow to not get all the items on the last page
             if page == pages:  # Last page
                 datasets_containers = datasets_containers[:last_page_item]
             async for dataset in tqdm(datasets_containers):
@@ -351,7 +368,8 @@ class Scraper:
         :return: None
         """
         waits = []
-        async with ClientSession() as session:
+        # We create a new session because the self session is only for data.gov.uk
+        async with ClientSession(raise_for_status=True) as session:
             dataset: Dataset
             async for dataset in tqdm(self.datasets):
                 waits.extend(dataset.download_files(session))
@@ -359,7 +377,7 @@ class Scraper:
             logger.info(
                 "Downloaded %s datasets in %s",
                 len(self.datasets),
-                Path.home() / "datagovuk",
+                OUTPUT_DIRECTORY,
             )
 
     def save_metadata(self) -> None:
@@ -374,11 +392,24 @@ class Scraper:
 
         :return: None
         """
-        filename: Path = (
-            Path.home() / "datagovuk" / f"datasets-metadata-{int(time.time())}.json"
-        )
+        filename: Path = OUTPUT_DIRECTORY / f"datasets-metadata-{int(time.time())}.json"
         with open(filename, "w", encoding="utf-8") as file:
             json.dump(
                 obj=self.datasets, fp=file, indent=4, default=lambda obj: obj.to_json()
             )
         logger.info("Wrote metadata in %s", filename)
+
+    @staticmethod
+    def clean_output_directory() -> None:
+        """Clean the output directory.
+
+        This function will delete the files in the output directory.
+        It raises an error if the output directory can't be deleted.
+
+        Example:
+            >>> Scraper.clean_output_directory()
+        """
+        # Check if the output directory exists
+        if OUTPUT_DIRECTORY.exists():
+            shutil.rmtree(OUTPUT_DIRECTORY, ignore_errors=False)
+            logger.info("Cleaned output directory")

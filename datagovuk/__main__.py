@@ -29,8 +29,8 @@ async def run():
         choices=["csv", "ods", "html", "pdf", "xls", "zip"],
     )
     parser.add_argument(
-        "-d",
         "--debug",
+        "-d",
         help="Put the logger in debug mode",
         action="store_const",
         dest="log_level",
@@ -38,12 +38,19 @@ async def run():
         default=logging.WARNING,
     )
     parser.add_argument(
-        "-v",
         "--verbose",
+        "-v",
         help="Put the logger in info mode",
         dest="log_level",
         action="store_const",
         const=logging.INFO,
+    )
+    parser.add_argument(
+        "--clean",
+        "-c",
+        dest="clean",
+        help="Clean the output directory",
+        action="store_true",
     )
     args = parser.parse_args()
     if not args.query:
@@ -54,6 +61,10 @@ async def run():
         level=args.log_level,
         format="[%(name)s] [%(levelname)s] - %(message)s ",
     )
+    logging.debug(args)
+    # Delete the output directory if clean is set
+    if args.clean:
+        Scraper.clean_output_directory()
     # Run the scraper
     scraper = Scraper(query=args.query, format_type=args.output)
     try:
