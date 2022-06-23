@@ -2,7 +2,8 @@
 
 """Scrap public data from data.gov.uk.
 
-This module provides a scraper class that can be used to fetch public data from data.gov.uk asynchronously.
+This module provides a scraper class that can be used to fetch public
+data from data.gov.uk asynchronously.
 """
 
 import asyncio
@@ -10,8 +11,8 @@ import json
 import logging
 import math
 import os
-from pathlib import Path
 import time
+from pathlib import Path
 
 import requests
 from aiohttp import ClientResponse, ClientSession
@@ -25,7 +26,7 @@ class Dataset:
     """A representation of a dataset in the database of data.gov.uk."""
 
     def __init__(self, dataset_id: str, title: str, url: str, soup: BeautifulSoup):
-        """Initialize the dataset
+        """Initialize the dataset.
 
         Example:
             >>> dataset = Dataset(
@@ -168,7 +169,8 @@ class Dataset:
 
 
 class Scraper:
-    """This class provide a scraper that can be used to fetch public data from data.gov.uk asynchronously.
+    """This class provide a scraper that can be used to fetch public data from
+    data.gov.uk asynchronously.
 
     You need to check the number of records that exist on data.gov.uk.
     If you indicate a number of pages greater than this number, the scraper will stop and throw an exception.
@@ -183,7 +185,7 @@ class Scraper:
     PER_PAGE: int = 20
 
     def __init__(self, query: str, format_type: str = "CSV") -> None:
-        """Initialize the scraper
+        """Initialize the scraper.
 
         You can search in https://data.gov.uk/search to see the results in preamble.
 
@@ -244,7 +246,7 @@ class Scraper:
         return BeautifulSoup(search_response.text, "html.parser")
 
     async def get_dataset(self, dataset: BeautifulSoup) -> Dataset:
-        """Get the dataset from the soup
+        """Get the dataset from the soup.
 
         This function is used to transform a BeautifulSoup object (corresponding to a html dataset) into a Dataset object.
 
@@ -303,7 +305,7 @@ class Scraper:
 
         This function will iterate through the pages until it reaches the count.
 
-        >>> Example (with 50 datasets):
+        Example (with 50 datasets):
             >>> scraper = Scraper(query="map", format_type="csv")
             >>> await scraper.get_datasets(count=50)
             >>> len(scraper.datasets)
