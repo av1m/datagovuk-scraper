@@ -1,5 +1,5 @@
 # Python HTTP for Humans.
-requests==2.27.1
+requests==2.31.0
 # Typing stubs for requests
 types-requests==2.27.20
 # Screen-scraping library
